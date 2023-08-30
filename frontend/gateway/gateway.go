@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/mount"
-	"github.com/docker/distribution/reference"
+	"github.com/distribution/reference"
 	"github.com/gogo/googleapis/google/rpc"
 	gogotypes "github.com/gogo/protobuf/types"
 	"github.com/golang/protobuf/ptypes/any"
