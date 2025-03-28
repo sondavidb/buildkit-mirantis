@@ -11,14 +11,14 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/pkg/userns"
-	"github.com/docker/docker/pkg/idtools"
 	"github.com/mitchellh/hashstructure/v2"
 	"github.com/moby/buildkit/executor"
 	"github.com/moby/buildkit/snapshot"
 	"github.com/moby/buildkit/util/network"
 	rootlessmountopts "github.com/moby/buildkit/util/rootless/mountopts"
 	traceexec "github.com/moby/buildkit/util/tracing/exec"
+	"github.com/moby/sys/user"
+	"github.com/moby/sys/userns"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/pkg/errors"
@@ -57,7 +57,7 @@ func (pm ProcessMode) String() string {
 
 // GenerateSpec generates spec using containerd functionality.
 // opts are ignored for s.Process, s.Hostname, and s.Mounts .
-func GenerateSpec(ctx context.Context, meta executor.Meta, mounts []executor.Mount, id, resolvConf, hostsFile string, namespace network.Namespace, cgroupParent string, processMode ProcessMode, idmap *idtools.IdentityMapping, apparmorProfile string, selinuxB bool, tracingSocket string, opts ...oci.SpecOpts) (*specs.Spec, func(), error) {
+func GenerateSpec(ctx context.Context, meta executor.Meta, mounts []executor.Mount, id, resolvConf, hostsFile string, namespace network.Namespace, cgroupParent string, processMode ProcessMode, idmap *user.IdentityMapping, apparmorProfile string, selinuxB bool, tracingSocket string, opts ...oci.SpecOpts) (*specs.Spec, func(), error) {
 	c := &containers.Container{
 		ID: id,
 	}
@@ -299,13 +299,13 @@ func (s *submounts) cleanup() {
 	wg.Wait()
 }
 
-func specMapping(s []idtools.IDMap) []specs.LinuxIDMapping {
+func specMapping(s []user.IDMap) []specs.LinuxIDMapping {
 	var ids []specs.LinuxIDMapping
 	for _, item := range s {
 		ids = append(ids, specs.LinuxIDMapping{
-			HostID:      uint32(item.HostID),
-			ContainerID: uint32(item.ContainerID),
-			Size:        uint32(item.Size),
+			HostID:      uint32(item.ParentID),
+			ContainerID: uint32(item.ID),
+			Size:        uint32(item.Count),
 		})
 	}
 	return ids

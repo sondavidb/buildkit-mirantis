@@ -6,14 +6,16 @@ import (
 	"path/filepath"
 
 	"github.com/docker/docker/libnetwork/resolvconf"
-	"github.com/docker/docker/pkg/idtools"
 	"github.com/moby/buildkit/util/flightcontrol"
+	"github.com/moby/sys/user"
 	"github.com/pkg/errors"
 )
 
-var g flightcontrol.Group[struct{}]
-var notFirstRun bool
-var lastNotEmpty bool
+var (
+	g            flightcontrol.Group[struct{}]
+	notFirstRun  bool
+	lastNotEmpty bool
+)
 
 // overridden by tests
 var resolvconfPath = resolvconf.Path
@@ -24,7 +26,7 @@ type DNSConfig struct {
 	SearchDomains []string
 }
 
-func GetResolvConf(ctx context.Context, stateDir string, idmap *idtools.IdentityMapping, dns *DNSConfig) (string, error) {
+func GetResolvConf(ctx context.Context, stateDir string, idmap *user.IdentityMapping, dns *DNSConfig) (string, error) {
 	p := filepath.Join(stateDir, "resolv.conf")
 	_, err := g.Do(ctx, stateDir, func(ctx context.Context) (struct{}, error) {
 		generate := !notFirstRun
@@ -100,8 +102,8 @@ func GetResolvConf(ctx context.Context, stateDir string, idmap *idtools.Identity
 		}
 
 		if idmap != nil {
-			root := idmap.RootPair()
-			if err := os.Chown(tmpPath, root.UID, root.GID); err != nil {
+			uid, gid := idmap.RootPair()
+			if err := os.Chown(tmpPath, uid, gid); err != nil {
 				return struct{}{}, err
 			}
 		}

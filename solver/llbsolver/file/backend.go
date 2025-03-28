@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/containerd/continuity/fs"
-	"github.com/docker/docker/pkg/idtools"
 	"github.com/moby/buildkit/snapshot"
 	"github.com/moby/buildkit/solver/llbsolver/ops/fileoptypes"
 	"github.com/moby/buildkit/solver/pb"
 	"github.com/moby/buildkit/util/system"
+	"github.com/moby/sys/user"
 	"github.com/pkg/errors"
 	copy "github.com/tonistiigi/fsutil/copy"
 )
@@ -27,7 +27,7 @@ func timestampToTime(ts int64) *time.Time {
 	return &tm
 }
 
-func mapUserToChowner(user *copy.User, idmap *idtools.IdentityMapping) (copy.Chowner, error) {
+func mapUserToChowner(user *copy.User, idmap *user.IdentityMapping) (copy.Chowner, error) {
 	if user == nil {
 		return func(old *copy.User) (*copy.User, error) {
 			if old == nil {
@@ -37,14 +37,11 @@ func mapUserToChowner(user *copy.User, idmap *idtools.IdentityMapping) (copy.Cho
 				old = &copy.User{} // root
 				// non-nil old is already mapped
 				if idmap != nil {
-					identity, err := idmap.ToHost(idtools.Identity{
-						UID: old.UID,
-						GID: old.GID,
-					})
+					uid, gid, err := idmap.ToHost(old.UID, old.GID)
 					if err != nil {
 						return nil, err
 					}
-					return &copy.User{UID: identity.UID, GID: identity.GID}, nil
+					return &copy.User{UID: uid, GID: gid}, nil
 				}
 			}
 			return old, nil
@@ -52,22 +49,19 @@ func mapUserToChowner(user *copy.User, idmap *idtools.IdentityMapping) (copy.Cho
 	}
 	u := *user
 	if idmap != nil {
-		identity, err := idmap.ToHost(idtools.Identity{
-			UID: user.UID,
-			GID: user.GID,
-		})
+		uid, gid, err := idmap.ToHost(user.UID, user.GID)
 		if err != nil {
 			return nil, err
 		}
-		u.UID = identity.UID
-		u.GID = identity.GID
+		u.UID = uid
+		u.GID = gid
 	}
 	return func(*copy.User) (*copy.User, error) {
 		return &u, nil
 	}, nil
 }
 
-func mkdir(ctx context.Context, d string, action pb.FileActionMkDir, user *copy.User, idmap *idtools.IdentityMapping) error {
+func mkdir(ctx context.Context, d string, action pb.FileActionMkDir, user *copy.User, idmap *user.IdentityMapping) error {
 	p, err := fs.RootPath(d, action.Path)
 	if err != nil {
 		return err
@@ -100,7 +94,7 @@ func mkdir(ctx context.Context, d string, action pb.FileActionMkDir, user *copy.
 	return nil
 }
 
-func mkfile(ctx context.Context, d string, action pb.FileActionMkFile, user *copy.User, idmap *idtools.IdentityMapping) error {
+func mkfile(ctx context.Context, d string, action pb.FileActionMkFile, user *copy.User, idmap *user.IdentityMapping) error {
 	p, err := fs.RootPath(d, filepath.Join("/", action.Path))
 	if err != nil {
 		return err
@@ -171,7 +165,7 @@ func rmPath(root, src string, allowNotFound bool) error {
 	return nil
 }
 
-func docopy(ctx context.Context, src, dest string, action pb.FileActionCopy, u *copy.User, idmap *idtools.IdentityMapping) error {
+func docopy(ctx context.Context, src, dest string, action pb.FileActionCopy, u *copy.User, idmap *user.IdentityMapping) error {
 	srcPath, err := cleanPath(action.Src)
 	if err != nil {
 		return errors.Wrap(err, "cleaning source path")

@@ -15,7 +15,7 @@ import (
 )
 
 func sub(m mount.Mount, subPath string) (mount.Mount, func() error, error) {
-	var retries = 10
+	retries := 10
 	root := m.Source
 	for {
 		src, err := fs.RootPath(root, subPath)

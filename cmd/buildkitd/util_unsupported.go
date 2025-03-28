@@ -4,11 +4,11 @@
 package main
 
 import (
-	"github.com/docker/docker/pkg/idtools"
+	"github.com/moby/sys/user"
 	"github.com/pkg/errors"
 )
 
-func parseIdentityMapping(str string) (*idtools.IdentityMapping, error) {
+func parseIdentityMapping(str string) (*user.IdentityMapping, error) {
 	if str == "" {
 		return nil, nil
 	}

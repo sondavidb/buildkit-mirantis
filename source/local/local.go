@@ -6,10 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	srctypes "github.com/moby/buildkit/source/types"
-	"github.com/moby/buildkit/util/bklog"
-
-	"github.com/docker/docker/pkg/idtools"
 	"github.com/moby/buildkit/cache"
 	"github.com/moby/buildkit/cache/contenthash"
 	"github.com/moby/buildkit/client"
@@ -18,7 +14,10 @@ import (
 	"github.com/moby/buildkit/snapshot"
 	"github.com/moby/buildkit/solver"
 	"github.com/moby/buildkit/source"
+	srctypes "github.com/moby/buildkit/source/types"
+	"github.com/moby/buildkit/util/bklog"
 	"github.com/moby/buildkit/util/progress"
+	"github.com/moby/sys/user"
 	digest "github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 	"github.com/tonistiigi/fsutil"
@@ -199,15 +198,12 @@ func (ls *localSourceHandler) snapshot(ctx context.Context, caller session.Calle
 
 	if idmap := mount.IdentityMapping(); idmap != nil {
 		opt.Filter = func(p string, stat *fstypes.Stat) bool {
-			identity, err := idmap.ToHost(idtools.Identity{
-				UID: int(stat.Uid),
-				GID: int(stat.Gid),
-			})
+			uid, gid, err := idmap.ToHost(int(stat.Uid), int(stat.Gid))
 			if err != nil {
 				return false
 			}
-			stat.Uid = uint32(identity.UID)
-			stat.Gid = uint32(identity.GID)
+			stat.Uid = uint32(uid)
+			stat.Gid = uint32(gid)
 			return true
 		}
 	}
@@ -270,7 +266,7 @@ func newProgressHandler(ctx context.Context, id string) func(int, bool) {
 
 type cacheUpdater struct {
 	contenthash.CacheContext
-	idmap *idtools.IdentityMapping
+	idmap *user.IdentityMapping
 }
 
 func (cu *cacheUpdater) MarkSupported(bool) {
@@ -280,8 +276,10 @@ func (cu *cacheUpdater) ContentHasher() fsutil.ContentHasher {
 	return contenthash.NewFromStat
 }
 
-const keySharedKey = "local.sharedKey"
-const sharedKeyIndex = keySharedKey + ":"
+const (
+	keySharedKey   = "local.sharedKey"
+	sharedKeyIndex = keySharedKey + ":"
+)
 
 func searchSharedKey(ctx context.Context, store cache.MetadataStore, k string) ([]cacheRefMetadata, error) {
 	var results []cacheRefMetadata

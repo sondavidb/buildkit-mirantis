@@ -12,7 +12,6 @@ import (
 	ctdmetadata "github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/platforms"
 	ctdsnapshot "github.com/containerd/containerd/snapshots"
-	"github.com/docker/docker/pkg/idtools"
 	"github.com/moby/buildkit/cache"
 	"github.com/moby/buildkit/cache/metadata"
 	"github.com/moby/buildkit/executor/oci"
@@ -24,6 +23,7 @@ import (
 	"github.com/moby/buildkit/util/winlayers"
 	"github.com/moby/buildkit/worker/base"
 	wlabel "github.com/moby/buildkit/worker/label"
+	"github.com/moby/sys/user"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
 	"golang.org/x/sync/semaphore"
@@ -36,7 +36,7 @@ type SnapshotterFactory struct {
 }
 
 // NewWorkerOpt creates a WorkerOpt.
-func NewWorkerOpt(root string, snFactory SnapshotterFactory, rootless bool, processMode oci.ProcessMode, labels map[string]string, idmap *idtools.IdentityMapping, nopt netproviders.Opt, dns *oci.DNSConfig, binary, apparmorProfile string, selinux bool, parallelismSem *semaphore.Weighted, traceSocket, defaultCgroupParent string) (base.WorkerOpt, error) {
+func NewWorkerOpt(root string, snFactory SnapshotterFactory, rootless bool, processMode oci.ProcessMode, labels map[string]string, idmap *user.IdentityMapping, nopt netproviders.Opt, dns *oci.DNSConfig, binary, apparmorProfile string, selinux bool, parallelismSem *semaphore.Weighted, traceSocket, defaultCgroupParent string) (base.WorkerOpt, error) {
 	var opt base.WorkerOpt
 	name := "runc-" + snFactory.Name
 	root = filepath.Join(root, name)

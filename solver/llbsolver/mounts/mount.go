@@ -8,11 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/moby/buildkit/util/bklog"
-
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/userns"
-	"github.com/docker/docker/pkg/idtools"
 	"github.com/moby/buildkit/cache"
 	"github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/identity"
@@ -21,8 +17,11 @@ import (
 	"github.com/moby/buildkit/session/sshforward"
 	"github.com/moby/buildkit/snapshot"
 	"github.com/moby/buildkit/solver/pb"
+	"github.com/moby/buildkit/util/bklog"
 	"github.com/moby/buildkit/util/grpcerrors"
 	"github.com/moby/locker"
+	"github.com/moby/sys/user"
+	"github.com/moby/sys/userns"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 )
@@ -186,7 +185,7 @@ func (mm *MountManager) getSSHMountable(ctx context.Context, m *pb.Mount, g sess
 type sshMount struct {
 	mount  *pb.Mount
 	caller session.Caller
-	idmap  *idtools.IdentityMapping
+	idmap  *user.IdentityMapping
 }
 
 func (sm *sshMount) Mount(ctx context.Context, readonly bool, g session.Group) (snapshot.Mountable, error) {
@@ -195,7 +194,7 @@ func (sm *sshMount) Mount(ctx context.Context, readonly bool, g session.Group) (
 
 type sshMountInstance struct {
 	sm    *sshMount
-	idmap *idtools.IdentityMapping
+	idmap *user.IdentityMapping
 }
 
 func (sm *sshMountInstance) Mount() ([]mount.Mount, func() error, error) {
@@ -205,16 +204,12 @@ func (sm *sshMountInstance) Mount() ([]mount.Mount, func() error, error) {
 	gid := int(sm.sm.mount.SSHOpt.Gid)
 
 	if sm.idmap != nil {
-		identity, err := sm.idmap.ToHost(idtools.Identity{
-			UID: uid,
-			GID: gid,
-		})
+		var err error
+		uid, gid, err = sm.idmap.ToHost(uid, gid)
 		if err != nil {
 			cancel()
 			return nil, nil, err
 		}
-		uid = identity.UID
-		gid = identity.GID
 	}
 
 	sock, cleanup, err := sshforward.MountSSHSocket(ctx, sm.sm.caller, sshforward.SocketOpt{
@@ -243,7 +238,7 @@ func (sm *sshMountInstance) Mount() ([]mount.Mount, func() error, error) {
 	}}, release, nil
 }
 
-func (sm *sshMountInstance) IdentityMapping() *idtools.IdentityMapping {
+func (sm *sshMountInstance) IdentityMapping() *user.IdentityMapping {
 	return sm.idmap
 }
 
@@ -278,7 +273,7 @@ func (mm *MountManager) getSecretMountable(ctx context.Context, m *pb.Mount, g s
 type secretMount struct {
 	mount *pb.Mount
 	data  []byte
-	idmap *idtools.IdentityMapping
+	idmap *user.IdentityMapping
 }
 
 func (sm *secretMount) Mount(ctx context.Context, readonly bool, g session.Group) (snapshot.Mountable, error) {
@@ -288,7 +283,7 @@ func (sm *secretMount) Mount(ctx context.Context, readonly bool, g session.Group
 type secretMountInstance struct {
 	sm    *secretMount
 	root  string
-	idmap *idtools.IdentityMapping
+	idmap *user.IdentityMapping
 }
 
 func (sm *secretMountInstance) Mount() ([]mount.Mount, func() error, error) {
@@ -339,16 +334,11 @@ func (sm *secretMountInstance) Mount() ([]mount.Mount, func() error, error) {
 	gid := int(sm.sm.mount.SecretOpt.Gid)
 
 	if sm.idmap != nil {
-		identity, err := sm.idmap.ToHost(idtools.Identity{
-			UID: uid,
-			GID: gid,
-		})
+		uid, gid, err = sm.idmap.ToHost(uid, gid)
 		if err != nil {
 			cleanup()
 			return nil, nil, err
 		}
-		uid = identity.UID
-		gid = identity.GID
 	}
 
 	if err := os.Chown(fp, uid, gid); err != nil {
@@ -368,7 +358,7 @@ func (sm *secretMountInstance) Mount() ([]mount.Mount, func() error, error) {
 	}}, cleanup, nil
 }
 
-func (sm *secretMountInstance) IdentityMapping() *idtools.IdentityMapping {
+func (sm *secretMountInstance) IdentityMapping() *user.IdentityMapping {
 	return sm.idmap
 }
 
@@ -391,12 +381,12 @@ func (mm *MountManager) MountableSSH(ctx context.Context, m *pb.Mount, g session
 	return mm.getSSHMountable(ctx, m, g)
 }
 
-func newTmpfs(idmap *idtools.IdentityMapping, opt *pb.TmpfsOpt) cache.Mountable {
+func newTmpfs(idmap *user.IdentityMapping, opt *pb.TmpfsOpt) cache.Mountable {
 	return &tmpfs{idmap: idmap, opt: opt}
 }
 
 type tmpfs struct {
-	idmap *idtools.IdentityMapping
+	idmap *user.IdentityMapping
 	opt   *pb.TmpfsOpt
 }
 
@@ -406,7 +396,7 @@ func (f *tmpfs) Mount(ctx context.Context, readonly bool, g session.Group) (snap
 
 type tmpfsMount struct {
 	readonly bool
-	idmap    *idtools.IdentityMapping
+	idmap    *user.IdentityMapping
 	opt      *pb.TmpfsOpt
 }
 
@@ -427,7 +417,7 @@ func (m *tmpfsMount) Mount() ([]mount.Mount, func() error, error) {
 	}}, func() error { return nil }, nil
 }
 
-func (m *tmpfsMount) IdentityMapping() *idtools.IdentityMapping {
+func (m *tmpfsMount) IdentityMapping() *user.IdentityMapping {
 	return m.idmap
 }
 

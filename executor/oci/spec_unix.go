@@ -13,10 +13,10 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
 	cdseccomp "github.com/containerd/containerd/pkg/seccomp"
-	"github.com/docker/docker/pkg/idtools"
 	"github.com/docker/docker/profiles/seccomp"
 	"github.com/moby/buildkit/solver/pb"
 	"github.com/moby/buildkit/util/entitlements/security"
+	"github.com/moby/sys/user"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	selinux "github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -92,7 +92,7 @@ func generateProcessModeOpts(mode ProcessMode) ([]oci.SpecOpts, error) {
 	return nil, nil
 }
 
-func generateIDmapOpts(idmap *idtools.IdentityMapping) ([]oci.SpecOpts, error) {
+func generateIDmapOpts(idmap *user.IdentityMapping) ([]oci.SpecOpts, error) {
 	if idmap == nil {
 		return nil, nil
 	}

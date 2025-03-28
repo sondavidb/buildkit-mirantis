@@ -17,7 +17,6 @@ import (
 	"unicode"
 
 	securejoin "github.com/cyphar/filepath-securejoin"
-	"github.com/docker/docker/pkg/idtools"
 	"github.com/moby/buildkit/cache"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/snapshot"
@@ -320,15 +319,10 @@ func (hs *httpSourceHandler) save(ctx context.Context, resp *http.Response, s se
 	uid := hs.src.UID
 	gid := hs.src.GID
 	if idmap := mount.IdentityMapping(); idmap != nil {
-		identity, err := idmap.ToHost(idtools.Identity{
-			UID: int(uid),
-			GID: int(gid),
-		})
+		uid, gid, err = idmap.ToHost(int(uid), int(gid))
 		if err != nil {
 			return nil, "", err
 		}
-		uid = identity.UID
-		gid = identity.GID
 	}
 
 	if gid != 0 || uid != 0 {
@@ -475,9 +469,11 @@ type cacheRefMetadata struct {
 	cache.RefMetadata
 }
 
-const keyHTTPChecksum = "http.checksum"
-const keyETag = "etag"
-const keyModTime = "http.modtime"
+const (
+	keyHTTPChecksum = "http.checksum"
+	keyETag         = "etag"
+	keyModTime      = "http.modtime"
+)
 
 func (md cacheRefMetadata) getHTTPChecksum() digest.Digest {
 	return digest.Digest(md.GetString(keyHTTPChecksum))

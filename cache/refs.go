@@ -14,9 +14,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/docker/docker/pkg/idtools"
 	"github.com/hashicorp/go-multierror"
 	"github.com/moby/buildkit/cache/config"
 	"github.com/moby/buildkit/identity"
@@ -32,6 +30,8 @@ import (
 	rootlessmountopts "github.com/moby/buildkit/util/rootless/mountopts"
 	"github.com/moby/buildkit/util/winlayers"
 	"github.com/moby/sys/mountinfo"
+	"github.com/moby/sys/user"
+	"github.com/moby/sys/userns"
 	digest "github.com/opencontainers/go-digest"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
@@ -46,7 +46,7 @@ type Ref interface {
 	Mountable
 	RefMetadata
 	Release(context.Context) error
-	IdentityMapping() *idtools.IdentityMapping
+	IdentityMapping() *user.IdentityMapping
 	DescHandler(digest.Digest) *DescHandler
 }
 
@@ -307,7 +307,7 @@ func (cr *cacheRecord) isLazy(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (cr *cacheRecord) IdentityMapping() *idtools.IdentityMapping {
+func (cr *cacheRecord) IdentityMapping() *user.IdentityMapping {
 	return cr.cm.IdentityMapping()
 }
 
