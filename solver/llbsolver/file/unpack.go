@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/containerd/continuity/fs"
-	"github.com/docker/docker/pkg/archive"
-	"github.com/docker/docker/pkg/chrootarchive"
+	archive "github.com/moby/go-archive"
+	"github.com/moby/go-archive/chrootarchive"
 	copy "github.com/tonistiigi/fsutil/copy"
 )
 
@@ -35,8 +35,13 @@ func unpack(ctx context.Context, srcRoot string, src string, destRoot string, de
 	}
 	defer file.Close()
 
-	return true, chrootarchive.Untar(file, dest, nil)
-
+	opts := &archive.TarOptions{
+		BestEffortXattrs: true,
+	}
+	if idmap != nil {
+		opts.IDMap = *idmap
+	}
+	return true, chrootarchive.Untar(file, dest, opts)
 }
 
 func isArchivePath(path string) bool {
